@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>designedbyyeon — Portfolio (prototype)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>designedbyyeon</h1>
+    <span class="badge">prototype</span>
+  </header>
+
+  <section class="filters" aria-label="태그 필터">
+    <div class="filters-head">
+      <strong>태그 필터</strong>
+      <div class="mode" role="group" aria-label="필터 방식">
+        <button type="button" data-mode="and" title="선택한 태그를 모두 가진 작업만">모두 포함 (AND)</button>
+        <button type="button" data-mode="or" title="선택한 태그 중 하나라도 가진 작업">하나라도 (OR)</button>
+      </div>
+      <button type="button" id="clear">선택 해제</button>
+    </div>
+    <div id="tag-groups"></div>
+  </section>
+
+  <section class="toolbar">
+    <span id="summary"></span>
+    <span class="spacer"></span>
+    <button type="button" id="include-all">모두 PDF에 포함</button>
+    <button type="button" id="pdf-btn" class="primary">PDF 다운로드</button>
+  </section>
+
+  <main id="grid"></main>
+
+  <dialog id="detail"></dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="pdf.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

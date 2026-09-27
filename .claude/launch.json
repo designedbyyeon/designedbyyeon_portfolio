@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "portfolio", "runtimeExecutable": "python", "runtimeArgs": ["serve.py", "8000", "--no-open"], "port": 8000 }
+  ]
+}
