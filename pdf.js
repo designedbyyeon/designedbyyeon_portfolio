@@ -3,8 +3,10 @@
 // 한글 폰트를 PDF에 따로 넣지 않아도 글자가 깨지지 않는다.
 const PDF_SITE_NAME = "designedbyyeon";
 const PAGE = { w: 1754, h: 1240, m: 90 }; // A4 가로, 150dpi 기준 픽셀
-const FONT = '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
-const COLOR = { fg: "#111", muted: "#888", line: "#ddd", chip: "#eee", imgBg: "#f3f3f3" };
+const PDF_LOGO = "source/logo.svg";
+const LOGO_RATIO = 1470.17 / 659.86; // logo.svg viewBox 가로/세로
+const FONT = '"Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+const COLOR = { bg: "#fcfcfc", fg: "#000", muted: "#777", line: "#000", chip: "#c9c9c9", imgBg: "#efefef" };
 
 const imageCache = new Map();
 function loadImage(path) {
@@ -12,12 +14,22 @@ function loadImage(path) {
   if (!imageCache.has(path)) {
     imageCache.set(path, new Promise((resolve) => {
       const img = new Image();
+      const external = /^https?:/.test(path);
+      if (external) img.crossOrigin = "anonymous"; // 외부 이미지도 PDF에 그릴 수 있도록
       img.onload = () => resolve(img);
       img.onerror = () => resolve(null);
-      img.src = fileUrl(path);
+      img.src = external ? path : fileUrl(path);
     }));
   }
   return imageCache.get(path);
+}
+
+// 대표 이미지가 없는 영상 작업: 유튜브 썸네일 (고화질 없으면 120px 회색 이미지가 오므로 hq로)
+async function loadCover(w) {
+  if (w.cover || !w.videos?.length) return loadImage(w.cover);
+  const id = w.videos[0].id;
+  const max = await loadImage(`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`);
+  return max && max.naturalWidth > 120 ? max : loadImage(`https://i.ytimg.com/vi/${id}/hqdefault.jpg`);
 }
 
 function font(ctx, size, weight = 400) {
@@ -72,14 +84,14 @@ function drawImageFit(ctx, img, x, y, w, h, mode = "contain") {
   ctx.restore();
 }
 
-function drawChips(ctx, tags, x, y, maxW) {
-  font(ctx, 22);
+function drawChips(ctx, tags, x, y, maxW, tagColor) {
+  font(ctx, 22, 700);
   const padX = 16, h = 40, gap = 10;
   let cx = x, cy = y;
   for (const t of tags) {
     const w = ctx.measureText(t).width + padX * 2;
     if (cx > x && cx + w > x + maxW) { cx = x; cy += h + gap; }
-    ctx.fillStyle = COLOR.chip;
+    ctx.fillStyle = tagColor?.(t) || COLOR.chip;
     ctx.beginPath();
     ctx.roundRect ? ctx.roundRect(cx, cy, w, h, h / 2) : ctx.rect(cx, cy, w, h);
     ctx.fill();
@@ -103,35 +115,43 @@ function drawFooter(ctx, pageNo, total) {
 }
 
 function clear(ctx) {
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = COLOR.bg;
   ctx.fillRect(0, 0, PAGE.w, PAGE.h);
 }
 
-function drawCoverPage(ctx, works, opts, total) {
+async function drawCoverPage(ctx, works, opts, total) {
   clear(ctx);
   const { m } = PAGE;
-  ctx.fillStyle = COLOR.fg;
-  font(ctx, 110, 700);
-  ctx.fillText("Portfolio", m, m + 110);
-  font(ctx, 36);
-  ctx.fillText(PDF_SITE_NAME, m, m + 170);
+  const logoH = 220;
+  const logo = await loadImage(PDF_LOGO);
+  if (logo) ctx.drawImage(logo, m, m, logoH * LOGO_RATIO, logoH);
 
-  font(ctx, 26);
+  ctx.fillStyle = COLOR.fg;
+  ctx.textAlign = "right";
+  font(ctx, 28, 700);
+  ctx.fillText("Portfolio", PAGE.w - m, m + 28);
+  font(ctx, 24);
   ctx.fillStyle = COLOR.muted;
-  const joiner = opts.mode === "and" ? " + " : " 또는 ";
-  const filter = opts.selectedTags.length ? `태그: ${opts.selectedTags.join(joiner)}` : "전체 작업";
-  const date = new Date().toLocaleDateString("ko-KR");
-  ctx.fillText(`${filter}  ·  ${works.length}개 프로젝트  ·  ${date}`, m, m + 240);
+  ctx.fillText(new Date().toLocaleDateString("ko-KR"), PAGE.w - m, m + 66);
+  ctx.textAlign = "left";
+
+  const infoY = m + logoH + 90;
+  font(ctx, 26, 700);
+  ctx.fillStyle = COLOR.fg;
+  ctx.fillText(`${works.length}개 프로젝트`, m, infoY);
+  if (opts.selectedTags.length) {
+    drawChips(ctx, opts.selectedTags, m + ctx.measureText(`${works.length}개 프로젝트`).width + 30, infoY - 29, PAGE.w - m * 2 - 300, opts.tagColor);
+  }
 
   ctx.strokeStyle = COLOR.line;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(m, m + 290);
-  ctx.lineTo(PAGE.w - m, m + 290);
+  ctx.moveTo(m, infoY + 50);
+  ctx.lineTo(PAGE.w - m, infoY + 50);
   ctx.stroke();
 
   // 목차: 2단, 넘치면 생략
-  const top = m + 350, lineH = 46, colW = (PAGE.w - m * 2 - 60) / 2;
+  const top = infoY + 110, lineH = 46, colW = (PAGE.w - m * 2 - 60) / 2;
   const perCol = Math.floor((PAGE.h - 120 - top) / lineH);
   font(ctx, 24);
   works.slice(0, perCol * 2).forEach((w, i) => {
@@ -155,14 +175,14 @@ function drawCoverPage(ctx, works, opts, total) {
   drawFooter(ctx, 1, total);
 }
 
-async function drawWorkPage(ctx, w, pageNo, total) {
+async function drawWorkPage(ctx, w, pageNo, total, tagColor) {
   clear(ctx);
   const { m } = PAGE;
   const imgW = 1000, imgH = PAGE.h - m * 2 - 60;
   const colX = m + imgW + 60, colW = PAGE.w - m - colX;
   const bottom = m + imgH;
 
-  drawImageFit(ctx, await loadImage(w.cover), m, m, imgW, imgH);
+  drawImageFit(ctx, await loadCover(w), m, m, imgW, imgH);
 
   // 오른쪽 아래: 추가 이미지 최대 3장
   const extras = w.images.slice(1, 4);
@@ -184,27 +204,47 @@ async function drawWorkPage(ctx, w, pageNo, total) {
   ctx.fillStyle = COLOR.fg;
   y = drawTextBlock(ctx, w.title, colX, y + 48, colW, 64, y + 48 + 64 * 3) - 64 + 30;
 
-  const meta = [w.year, w.client, w.role].filter(Boolean).join("  ·  ");
+  const meta = [w.year, w.client].filter(Boolean).join("  ·  ");
   if (meta) {
     font(ctx, 24);
     ctx.fillStyle = COLOR.muted;
     y = drawTextBlock(ctx, meta, colX, y + 30, colW, 36, y + 30 + 36 * 2) + 10;
   }
 
-  y = drawChips(ctx, w.tags, colX, y + 10, colW) + 40;
+  y = drawChips(ctx, w.tags, colX, y + 10, colW, tagColor) + 40;
+
+  // 유튜브 링크: PDF에서 클릭하면 영상으로 이동
+  const links = [];
+  if (w.videos?.length) {
+    font(ctx, 22, 700);
+    ctx.fillStyle = COLOR.fg;
+    for (const v of w.videos) {
+      const label = `▶  영상 보기   youtu.be/${v.id}`;
+      const tw = ctx.measureText(label).width;
+      ctx.fillText(label, colX, y + 22);
+      ctx.fillRect(colX, y + 30, tw, 1.5);
+      links.push({ x: colX, y: y - 4, w: tw, h: 40, url: `https://youtu.be/${v.id}` });
+      y += 46;
+    }
+    y += 20;
+  }
 
   if (w.description) {
     font(ctx, 24);
-    ctx.fillStyle = "#333";
+    ctx.fillStyle = COLOR.fg;
     drawTextBlock(ctx, w.description, colX, y + 24, colW, 40, textBottom);
   }
   drawFooter(ctx, pageNo, total);
+  return links;
 }
 
 async function exportPortfolioPdf(works, opts) {
   if (!works.length) return;
   if (!window.jspdf) throw new Error("PDF 라이브러리(jsPDF)를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
-  await Promise.all([document.fonts.load(`400 24px ${FONT}`), document.fonts.load(`700 48px ${FONT}`)]);
+  // 웹폰트는 쓰는 글자만 나눠 받으므로, PDF에 들어갈 글자를 미리 불러온다
+  const text = ["Portfolio 0123456789 개 프로젝트 외 —·…/", PDF_SITE_NAME, ...opts.selectedTags,
+    ...works.flatMap((w) => [w.title, w.year, w.client, w.description, ...w.tags])].join(" ");
+  await Promise.all([400, 700].map((wt) => document.fonts.load(`${wt} 24px ${FONT}`, text)));
 
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
@@ -218,12 +258,14 @@ async function exportPortfolioPdf(works, opts) {
     pdf.addImage(canvas.toDataURL("image/jpeg", 0.88), "JPEG", 0, 0, 297, 210);
   };
 
-  drawCoverPage(ctx, works, opts, total);
+  await drawCoverPage(ctx, works, opts, total);
   addPage(true);
   for (let i = 0; i < works.length; i++) {
     opts.onProgress?.(i + 1, works.length);
-    await drawWorkPage(ctx, works[i], i + 2, total);
+    const links = await drawWorkPage(ctx, works[i], i + 2, total, opts.tagColor);
     addPage(false);
+    const k = 297 / PAGE.w; // 캔버스 px → mm
+    for (const l of links) pdf.link(l.x * k, l.y * k, l.w * k, l.h * k, { url: l.url });
   }
 
   const stamp = new Date().toISOString().slice(0, 10);

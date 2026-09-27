@@ -15,16 +15,21 @@ OUT_FILE = ROOT / "works.json"
 INFO_NAME = "info.txt"
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 
-# info.txt 에서 인식하는 항목 (한글/영문 모두 가능)
+# info.txt 에서 인식하는 항목 (한글/영문 모두 가능, 띄어쓰기 무시)
 KEY_ALIASES = {
-    "제목": "title", "title": "title",
+    "프로젝트명": "title", "제목": "title", "title": "title",
     "태그": "tags", "tags": "tags",
     "연도": "year", "year": "year",
     "클라이언트": "client", "client": "client",
-    "역할": "role", "role": "role",
     "순서": "order", "order": "order",
     "대표이미지": "cover", "cover": "cover",
+    "유튜브": "youtube", "영상": "youtube", "youtube": "youtube",
 }
+
+# youtu.be/ID, youtube.com/watch?v=ID, /shorts/ID, /embed/ID, /live/ID
+YOUTUBE_RE = re.compile(
+    r"(?:youtu\.be/|youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/))([\w-]{11})"
+)
 
 
 def read_text(path):
@@ -67,13 +72,23 @@ def parse_info(text):
         m = re.match(r"\s*([^:：]+?)\s*[:：]\s*(.*)$", line)
         if m:
             raw_key = m.group(1).strip()
-            key = KEY_ALIASES.get(raw_key.lower())
-            (meta if key else extra)[key or raw_key] = m.group(2).strip()
+            key = KEY_ALIASES.get(raw_key.lower().replace(" ", ""))
+            value = m.group(2).strip()
+            if key == "youtube":  # 여러 줄/여러 개 허용
+                meta.setdefault("youtube", []).extend(re.split(r"[\s,]+", value))
+            else:
+                (meta if key else extra)[key or raw_key] = value
         elif stripped:
             # 키 형식이 아닌 줄이 나오면 그때부터 본문으로 본다
             in_body = True
             body.append(line)
     return meta, extra, "\n".join(body).strip()
+
+
+def parse_tag_entry(entry):
+    """'한글레터링 #edc92f' → ('한글레터링', '#edc92f')"""
+    m = re.match(r"^(.*?)\s+(#[0-9a-fA-F]{3,8})$", entry)
+    return (m.group(1).strip(), m.group(2)) if m else (entry, None)
 
 
 def parse_tag_groups(text):
@@ -84,13 +99,18 @@ def parse_tag_groups(text):
             continue
         m = re.match(r"^\[(.+)\]$", s)
         if m:
-            cur = {"name": m.group(1).strip(), "tags": []}
+            cur = {"name": m.group(1).strip(), "tags": [], "colors": {}}
             groups.append(cur)
             continue
         if cur is None:
-            cur = {"name": "태그", "tags": []}
+            cur = {"name": "태그", "tags": [], "colors": {}}
             groups.append(cur)
-        cur["tags"] += [t for t in split_tags(s) if t not in cur["tags"]]
+        for entry in split_tags(s):
+            tag, color = parse_tag_entry(entry)
+            if tag not in cur["tags"]:
+                cur["tags"].append(tag)
+            if color:
+                cur["colors"][tag] = color
     return groups
 
 
@@ -125,6 +145,14 @@ def load_work(folder, warnings):
         images.remove(cover)
         images.insert(0, cover)
 
+    videos = []
+    for url in filter(None, meta.get("youtube", [])):
+        m = YOUTUBE_RE.search(url)
+        if m:
+            videos.append({"id": m.group(1), "url": url, "vertical": "/shorts/" in url})
+        else:
+            warnings.append(f"[{folder.name}] 유튜브 주소를 인식할 수 없음: {url}")
+
     order = meta.get("order", "")
     try:
         order = int(order)
@@ -138,11 +166,11 @@ def load_work(folder, warnings):
         "title": meta.get("title") or folder.name,
         "year": meta.get("year", ""),
         "client": meta.get("client", ""),
-        "role": meta.get("role", ""),
         "order": order,
         "tags": tags,
         "description": description,
         "extra": extra,
+        "videos": videos,
         "cover": rel(cover) if cover else None,
         "images": [rel(p) for p in images],
     }
@@ -170,10 +198,15 @@ def build(verbose=True):
         unused = [t for t in g["tags"] if t not in used]
         if unused:
             warnings.append(f"tags.txt [{g['name']}] 에 있지만 쓰이지 않는 태그: {', '.join(unused)}")
-        g["tags"] = [t for t in g["tags"] if t in used]
+        g["tags"] = [{"name": t, "color": g["colors"].get(t)} for t in g["tags"] if t in used]
+        del g["colors"]
+    # tags.txt에 없는 태그는 마지막 그룹(장르)에 회색으로 붙인다
     others = [t for t in used if t not in grouped]
     if others:
-        groups.append({"name": "기타", "tags": others})
+        warnings.append(f"tags.txt에 없는 태그 → 마지막 줄에 추가: {', '.join(others)}")
+        if not groups:
+            groups.append({"name": "태그", "tags": []})
+        groups[-1]["tags"] += [{"name": t, "color": None} for t in others]
     groups = [g for g in groups if g["tags"]]
 
     data = {
