@@ -86,9 +86,14 @@ def parse_info(text):
 
 
 def parse_tag_entry(entry):
-    """'한글레터링 #edc92f' → ('한글레터링', '#edc92f')"""
-    m = re.match(r"^(.*?)\s+(#[0-9a-fA-F]{3,8})$", entry)
-    return (m.group(1).strip(), m.group(2)) if m else (entry, None)
+    """'한글레터링 #edc92f = 레터링' → ('한글레터링', '#edc92f', ['레터링'])
+
+    '=' 뒤는 별칭: txt 파일에 별칭으로 적어도 앞의 이름으로 표시된다.
+    """
+    name, *aliases = [x.strip() for x in entry.split("=")]
+    m = re.match(r"^(.*?)\s+(#[0-9a-fA-F]{3,8})$", name)
+    tag, color = (m.group(1).strip(), m.group(2)) if m else (name, None)
+    return tag, color, [a for a in aliases if a]
 
 
 def parse_tag_groups(text):
@@ -99,19 +104,35 @@ def parse_tag_groups(text):
             continue
         m = re.match(r"^\[(.+)\]$", s)
         if m:
-            cur = {"name": m.group(1).strip(), "tags": [], "colors": {}}
+            cur = {"name": m.group(1).strip(), "tags": [], "colors": {}, "aliases": {}}
             groups.append(cur)
             continue
         if cur is None:
-            cur = {"name": "태그", "tags": [], "colors": {}}
+            cur = {"name": "태그", "tags": [], "colors": {}, "aliases": {}}
             groups.append(cur)
         for entry in split_tags(s):
-            tag, color = parse_tag_entry(entry)
+            tag, color, aliases = parse_tag_entry(entry)
             if tag not in cur["tags"]:
                 cur["tags"].append(tag)
             if color:
                 cur["colors"][tag] = color
+            for a in aliases:
+                cur["aliases"][a] = tag
     return groups
+
+
+def find_info_file(folder, warnings):
+    """info.txt > '폴더이름.txt' > 폴더 안의 유일한 .txt"""
+    txts = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".txt")
+    for name in (INFO_NAME, f"{folder.name}.txt"):
+        match = next((p for p in txts if p.name.lower() == name.lower()), None)
+        if match:
+            return match
+    if len(txts) == 1:
+        return txts[0]
+    if txts:
+        warnings.append(f"[{folder.name}] txt 파일이 여러 개라 어느 것을 쓸지 모름: {', '.join(p.name for p in txts)}")
+    return None
 
 
 def load_work(folder, warnings):
@@ -120,12 +141,12 @@ def load_work(folder, warnings):
         (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXT),
         key=lambda p: natural_key(p.name),
     )
-    info_path = folder / INFO_NAME
-    if info_path.exists():
+    info_path = find_info_file(folder, warnings)
+    if info_path:
         meta, extra, description = parse_info(read_text(info_path))
     else:
         meta, extra, description = {}, {}, ""
-        warnings.append(f"[{folder.name}] {INFO_NAME} 없음 → 폴더 이름을 제목으로 사용")
+        warnings.append(f"[{folder.name}] 설명 txt 파일 없음 → 폴더 이름을 제목으로 사용")
 
     tags = split_tags(meta.get("tags", ""))
     if not tags:
@@ -188,11 +209,22 @@ def build(verbose=True):
     works.sort(key=lambda w: w["year"], reverse=True)
     works.sort(key=lambda w: w["order"] if w["order"] is not None else float("inf"))
 
-    # 태그 그룹: tags.txt 정의 순서 + 정의되지 않은 태그는 '기타'로
+    groups = parse_tag_groups(read_text(TAGS_FILE)) if TAGS_FILE.exists() else []
+
+    # 별칭 → 표시 이름 (예: 레터링 → 한글레터링)
+    aliases = {a: t for g in groups for a, t in g.pop("aliases").items()}
+    for w in works:
+        mapped = []
+        for t in w["tags"]:
+            t = aliases.get(t, t)
+            if t not in mapped:
+                mapped.append(t)
+        w["tags"] = mapped
+
+    # 태그 그룹: tags.txt 정의 순서 + 정의되지 않은 태그는 마지막 줄로
     used = []
     for w in works:
         used += [t for t in w["tags"] if t not in used]
-    groups = parse_tag_groups(read_text(TAGS_FILE)) if TAGS_FILE.exists() else []
     grouped = {t for g in groups for t in g["tags"]}
     for g in groups:
         unused = [t for t in g["tags"] if t not in used]
