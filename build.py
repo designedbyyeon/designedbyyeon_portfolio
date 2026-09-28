@@ -44,9 +44,12 @@ def read_text(path):
 
 
 def split_tags(value):
-    """'레터링, 광고' 와 '레터링 / 광고' 둘 다 허용. 중복 제거, 순서 유지."""
+    """'레터링, 광고' 와 '레터링 / 광고' 둘 다 허용. 중복 제거, 순서 유지.
+
+    붙여 쓴 '/'는 태그 이름의 일부로 본다 → '방송/영화'는 태그 하나.
+    """
     tags = []
-    for t in re.split(r"[,/]", value):
+    for t in re.split(r",|\s+/\s+", value):
         t = t.strip()
         if t and t not in tags:
             tags.append(t)
