@@ -153,6 +153,9 @@ def load_work(folder, warnings):
         warnings.append(f"[{folder.name}] 태그 없음")
     if not images:
         warnings.append(f"[{folder.name}] 이미지 없음")
+    heavy = [p.name for p in images if p.stat().st_size > 2 * 1024 * 1024]
+    if heavy:
+        warnings.append(f"[{folder.name}] 2MB 넘는 이미지 {len(heavy)}개 → optimize_images.py 실행 추천")
 
     # 대표 이미지: info.txt 지정 > 파일명이 cover.* > 첫 번째 이미지
     cover = None
