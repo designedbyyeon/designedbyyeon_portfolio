@@ -72,6 +72,8 @@ const chipGroup = (tags) => tags.map((t, i) => i < tags.length - 1
   : chipHtml(t)).join("<wbr>");
 
 function buildSentence() {
+  // PDF 버튼이 문장 안에 붙어 있으면 문장을 다시 만들 때 함께 지워지므로 먼저 밖으로 빼 둔다
+  $("#actions").before($("#pdf-btn"));
   $("#sentence").innerHTML = `
     <span class="w lead">그래픽 디자이너 김도연입니다.</span><br>
     <span id="kind-line">${chipGroup(kindTags)}<span class="w" id="end1"></span></span><br>
@@ -130,9 +132,8 @@ function updateSentence() {
   composeLine($("#genre-line"), end2, g.length ? `${objectJosa(g.at(-1))} 만듭니다.` : "등을 만듭니다.", true);
   sentence.querySelector(".lead").classList.toggle("live", on);
 
-  // PDF 버튼은 지금 읽히는 문장의 끝에 붙임 (작업 종류만 골랐으면 "작업을 합니다." 뒤)
-  const end = k.length && !g.length ? end1 : end2;
-  (end.closest(".bind") || end).after($("#pdf-btn"));
+  // PDF 버튼은 선택과 상관없이 항상 문장 맨 끝 ("…등을 만듭니다." 뒤)
+  (end2.closest(".bind") || end2).after($("#pdf-btn"));
 }
 
 function updateCount(n) {
