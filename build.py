@@ -11,6 +11,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 WORKS_DIR = ROOT / "works"
 TAGS_FILE = ROOT / "tags.txt"
+ACTIVITIES_DIR = ROOT / "activities"
+ACTIVITY_GROUP = "활동"  # tags.txt에서 이 이름의 줄은 ACTIVITY 화면 태그
+CONTACT_FILE = ROOT / "contact.txt"
+CONTACT_KEYS = {
+    "이메일": "email", "email": "email",
+    "전화": "phone", "전화번호": "phone", "phone": "phone",
+    "카카오톡": "kakao", "카톡": "kakao", "kakao": "kakao",
+    "인스타그램": "instagram", "인스타": "instagram", "instagram": "instagram",
+}
 OUT_FILE = ROOT / "works.json"
 INFO_NAME = "info.txt"
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
@@ -203,23 +212,37 @@ def load_work(folder, warnings):
     }
 
 
-def build(verbose=True):
-    warnings = []
-    WORKS_DIR.mkdir(exist_ok=True)
+def load_contact():
+    """contact.txt 의 '키: 값' 줄을 읽는다. 비워둔 항목은 CONTACT 창에서 빠진다."""
+    contact = {}
+    if not CONTACT_FILE.exists():
+        return contact
+    for line in read_text(CONTACT_FILE).splitlines():
+        m = re.match(r"\s*([^:：#]+?)\s*[:：]\s*(.*)$", line)
+        if m and not line.lstrip().startswith("#"):
+            key = CONTACT_KEYS.get(m.group(1).strip().lower().replace(" ", ""))
+            if key and m.group(2).strip():
+                contact[key] = m.group(2).strip()
+    return contact
+
+
+def load_collection(directory, warnings):
+    """폴더 하나(works/ 또는 activities/)의 항목들을 읽어 정렬한다."""
+    directory.mkdir(exist_ok=True)
     folders = [
-        p for p in WORKS_DIR.iterdir()
+        p for p in directory.iterdir()
         if p.is_dir() and not p.name.startswith(("_", "."))  # _로 시작하면 비공개(임시저장)
     ]
-    works = [load_work(f, warnings) for f in folders]
-    works.sort(key=lambda w: natural_key(w["id"]))
-    works.sort(key=lambda w: w["year"], reverse=True)
-    works.sort(key=lambda w: w["order"] if w["order"] is not None else float("inf"))
+    items = [load_work(f, warnings) for f in folders]
+    items.sort(key=lambda w: natural_key(w["id"]))
+    items.sort(key=lambda w: w["year"], reverse=True)
+    items.sort(key=lambda w: w["order"] if w["order"] is not None else float("inf"))
+    return items
 
-    groups = parse_tag_groups(read_text(TAGS_FILE)) if TAGS_FILE.exists() else []
 
-    # 별칭 → 표시 이름 (예: 레터링 → 한글레터링)
-    aliases = {a: t for g in groups for a, t in g.pop("aliases").items()}
-    for w in works:
+def apply_aliases(items, aliases):
+    """별칭 → 표시 이름 (예: 레터링 → 한글레터링)"""
+    for w in items:
         mapped = []
         for t in w["tags"]:
             t = aliases.get(t, t)
@@ -227,9 +250,11 @@ def build(verbose=True):
                 mapped.append(t)
         w["tags"] = mapped
 
-    # 태그 그룹: tags.txt 정의 순서 + 정의되지 않은 태그는 마지막 줄로
+
+def finalize_groups(items, groups, warnings):
+    """tags.txt 정의 순서대로, 실제로 쓰인 태그만 남긴다. 정의 안 된 태그는 마지막 줄로."""
     used = []
-    for w in works:
+    for w in items:
         used += [t for t in w["tags"] if t not in used]
     grouped = {t for g in groups for t in g["tags"]}
     for g in groups:
@@ -238,24 +263,43 @@ def build(verbose=True):
             warnings.append(f"tags.txt [{g['name']}] 에 있지만 쓰이지 않는 태그: {', '.join(unused)}")
         g["tags"] = [{"name": t, "color": g["colors"].get(t)} for t in g["tags"] if t in used]
         del g["colors"]
-    # tags.txt에 없는 태그는 마지막 그룹(장르)에 회색으로 붙인다
     others = [t for t in used if t not in grouped]
     if others:
-        warnings.append(f"tags.txt에 없는 태그 → 마지막 줄에 추가: {', '.join(others)}")
+        warnings.append(f"tags.txt에 없는 태그 → [{groups[-1]['name'] if groups else '태그'}] 줄에 추가: {', '.join(others)}")
         if not groups:
             groups.append({"name": "태그", "tags": []})
         groups[-1]["tags"] += [{"name": t, "color": None} for t in others]
-    groups = [g for g in groups if g["tags"]]
+    return [g for g in groups if g["tags"]], len(used)
+
+
+def build(verbose=True):
+    warnings = []
+    works = load_collection(WORKS_DIR, warnings)
+    activities = load_collection(ACTIVITIES_DIR, warnings)
+
+    groups = parse_tag_groups(read_text(TAGS_FILE)) if TAGS_FILE.exists() else []
+    aliases = {a: t for g in groups for a, t in g.pop("aliases").items()}
+    apply_aliases(works, aliases)
+    apply_aliases(activities, aliases)
+
+    # [활동] 줄은 ACTIVITY 화면 전용, 나머지는 WORK 화면
+    work_groups = [g for g in groups if g["name"] != ACTIVITY_GROUP]
+    act_groups = [g for g in groups if g["name"] == ACTIVITY_GROUP] or [{"name": ACTIVITY_GROUP, "tags": [], "colors": {}}]
+    groups, n_work_tags = finalize_groups(works, work_groups, warnings)
+    activity_groups, n_act_tags = finalize_groups(activities, act_groups, warnings)
 
     data = {
         "generatedAt": datetime.datetime.now().isoformat(timespec="seconds"),
         "tagGroups": groups,
+        "activityGroups": activity_groups,
+        "contact": load_contact(),
         "works": works,
+        "activities": activities,
     }
     OUT_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if verbose:
-        print(f"[build] 작업 {len(works)}개, 태그 {len(used)}개 → {OUT_FILE.name}")
+        print(f"[build] 작업 {len(works)}개(태그 {n_work_tags}), 활동 {len(activities)}개(태그 {n_act_tags}) → {OUT_FILE.name}")
         for w in warnings:
             print(f"  ! {w}")
     return data

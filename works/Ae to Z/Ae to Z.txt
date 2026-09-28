@@ -1,6 +1,6 @@
-﻿프로젝트명: Ae to Z
+프로젝트명: aespa - Ae to Z
 연도: 2025
 클라이언트: SM Entertainment
-태그: 한글레터링, 엔터테인먼트
-유튜브: 
+태그: 영문레터링, 엔터테인먼트, 모션그래픽
+유튜브: https://www.youtube.com/watch?v=zc_T9SKolc0
 ---

@@ -14,9 +14,10 @@
       <img src="source/logo.svg" alt="디자인드바이연">
     </a>
     <nav class="nav" aria-label="주요 메뉴">
-      <!-- TODO: CONTACT / CODING 페이지 연결 -->
-      <a href="#work">WORK</a>
-      <a href="#">CONTACT</a>
+      <!-- TODO: CODING 페이지 연결 -->
+      <button type="button" data-view="work" class="on">WORK</button>
+      <button type="button" data-view="activity">ACTIVITY</button>
+      <button type="button" data-contact>CONTACT</button>
       <a href="#">CODING</a>
     </nav>
   </header>
@@ -33,8 +34,12 @@
   <div class="mini" id="mini"></div>
 
   <main id="work" class="grid"></main>
+  <!-- ACTIVITY: 워크숍·강의·아트프로젝트·대외활동. 한 활동 = 한 줄 (글 + 사진 여러 장) -->
+  <section id="activity" class="acts" hidden></section>
 
   <dialog id="detail" class="detail"></dialog>
+  <!-- 연락처 창: contact.txt 내용으로 문장을 만든다 -->
+  <dialog id="contact" class="contact" aria-label="연락처"></dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="pdf.js"></script>

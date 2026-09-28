@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""works/ 안의 이미지를 웹용으로 줄인다. (원본 파일은 변환 후 삭제됨)
+"""works/, activities/ 안의 이미지를 웹용으로 줄인다. (원본 파일은 변환 후 삭제됨)
 
 - 가로 2000px보다 크면 2000px로 줄임 (세로는 비율대로)
 - PNG / JPG / JPEG → WebP (투명 배경 유지, 용량은 훨씬 작음)
@@ -18,7 +18,7 @@ except ImportError:
     sys.exit("Pillow가 필요합니다:  pip install pillow")
 
 ROOT = Path(__file__).resolve().parent
-WORKS_DIR = ROOT / "works"
+DIRS = [ROOT / "works", ROOT / "activities"]
 MAX_WIDTH = 2000
 QUALITY = 82
 WEBP_MAX_SIDE = 16383  # WebP 형식의 한계
@@ -54,7 +54,7 @@ def optimize(path):
 
 def main():
     files = sorted(
-        p for p in WORKS_DIR.rglob("*")
+        p for d in DIRS if d.exists() for p in d.rglob("*")
         if p.is_file() and p.suffix.lower() in CONVERT_EXT
     )
     total_before = total_after = done = 0

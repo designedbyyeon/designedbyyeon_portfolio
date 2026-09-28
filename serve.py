@@ -23,7 +23,7 @@ OPEN_BROWSER = "--no-open" not in sys.argv
 
 
 def snapshot():
-    paths = [TAGS_FILE, ROOT / "build.py"] + (list(WORKS_DIR.rglob("*")) if WORKS_DIR.exists() else [])
+    paths = [TAGS_FILE, ROOT / "contact.txt", ROOT / "build.py"] + [f for d in (WORKS_DIR, ROOT / "activities") if d.exists() for f in d.rglob("*")]
     state = []
     for p in paths:
         try:

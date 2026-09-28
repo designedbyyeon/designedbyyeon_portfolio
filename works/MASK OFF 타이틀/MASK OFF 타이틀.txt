@@ -1,6 +1,6 @@
-﻿프로젝트명: MASK OFF 타이틀
+프로젝트명: LAY - MASK OFF
 연도: 2022
 클라이언트: 리전드필름
-태그: 한글레터링, 방송/영화, 엔터테인먼트
-유튜브: 
+태그: 한글레터링, 엔터테인먼트
+유튜브: https://www.youtube.com/watch?v=K4G2D6xSEMk
 ---
