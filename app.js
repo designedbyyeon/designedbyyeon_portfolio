@@ -182,6 +182,13 @@ function createTile(w, { reveal }) {
   return el;
 }
 
+function resetLeaving(el) {
+  el._exit?.cancel();
+  el._exit = null;
+  el.classList.remove("leaving");
+  el.removeAttribute("style");
+}
+
 // FLIP: 남는 타일은 새 자리로 미끄러지고, 빠지는 타일은 사라지고, 새 타일은 떠오름
 function renderGrid(visible, { animated = true, reveal = false } = {}) {
   const grid = $("#work");
@@ -197,8 +204,15 @@ function renderGrid(visible, { animated = true, reveal = false } = {}) {
     const r = first.get(el.dataset.id);
     el.classList.add("leaving");
     Object.assign(el.style, { left: `${r.left - gridRect.left}px`, top: `${r.top - gridRect.top}px`, width: `${r.width}px` });
-    el.animate([{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(.94)" }], { duration: 280, easing: EASE, fill: "forwards" })
-      .onfinish = () => el.remove();
+    // 사라지는 애니메이션은 요소에 참조를 남겨두고, 끝나면 반드시 취소해서
+    // 나중에 같은 타일을 다시 붙였을 때 투명한 상태가 남지 않게 한다.
+    // (DOM에서 떨어진 요소는 getAnimations()로 찾을 수 없음)
+    const exit = el.animate([{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(.94)" }], { duration: 280, easing: EASE, fill: "forwards" });
+    el._exit = exit;
+    exit.onfinish = () => {
+      el.remove();
+      resetLeaving(el);
+    };
   }
 
   const entering = [];
@@ -210,9 +224,7 @@ function renderGrid(visible, { animated = true, reveal = false } = {}) {
       if (reveal) revealer.observe(el);
     }
     if (el.classList.contains("leaving")) { // 사라지는 중에 다시 선택된 경우
-      el.getAnimations().forEach((a) => a.cancel());
-      el.classList.remove("leaving");
-      el.removeAttribute("style");
+      resetLeaving(el);
       entering.push(el);
     } else if (!el.isConnected) {
       entering.push(el);
@@ -234,7 +246,7 @@ function renderGrid(visible, { animated = true, reveal = false } = {}) {
   entering.forEach((el, i) => {
     el.querySelector(".tile-inner").classList.add("in");
     el.animate([{ opacity: 0, transform: "translateY(18px) scale(.97)" }, { opacity: 1, transform: "none" }],
-      { duration: 520, delay: 140 + i * 50, easing: EASE, fill: "backwards" });
+      { duration: 520, delay: 140 + Math.min(i, 12) * 50, easing: EASE, fill: "backwards" }); // 많아도 최대 0.8초
   });
 }
 
