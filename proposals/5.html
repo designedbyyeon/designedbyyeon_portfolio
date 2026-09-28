@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 5 — 워드마크 스트립</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: #fff; color: #111; font-size: 13px; min-height: 100vh; display: flex; flex-direction: column; }
+  .top { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 24px; padding: 20px 28px; line-height: 1.5; }
+  .top .c { text-align: center; }
+  .top .r { justify-self: end; border-bottom: 1px solid #111; height: fit-content; }
+  .tag { color: #111; }
+  .has-sel .tag:not(.on) { color: #b0b0b0; }
+  .sep { color: #b0b0b0; }
+  .tag.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c, #111); margin-right: 5px; vertical-align: 1px; }
+
+  /* 같은 크기의 정사각형 스트립 — 올린 작업만 크게 커지며 아래 워드마크를 덮음 */
+  .strip { position: relative; z-index: 2; display: flex; align-items: flex-start; overflow-x: auto; padding: 50px 0 0; scrollbar-width: none; height: 500px; pointer-events: none; }
+  .strip .cell { pointer-events: auto; }
+  .strip::-webkit-scrollbar { display: none; }
+  .cell { flex: none; width: 150px; cursor: pointer; transition: width .3s cubic-bezier(.3,.7,.2,1); }
+  .cell .no { font-size: 12px; margin-bottom: 10px; }
+  .cell .nm { font-size: 12px; line-height: 1.35; height: 3.2em; padding-right: 8px; overflow: hidden; }
+  .cell .nm span { color: #888; }
+  .cell .im { height: 150px; overflow: hidden; background: #eee; transition: height .3s cubic-bezier(.3,.7,.2,1); }
+  .cell img { width: 100%; height: 100%; object-fit: cover; }
+  .cell.big { width: 270px; }
+  .cell.big .im { height: 330px; }
+
+  .list { display: none; padding: 40px 28px; }
+  .list table { width: 100%; border-collapse: collapse; }
+  .list td { padding: 10px 0; border-top: 1px solid #eee; vertical-align: middle; }
+  .list tr:hover td { background: #fafafa; }
+  .list .th img { width: 44px; height: 44px; object-fit: cover; }
+  .mode-list .strip { display: none; }
+  .mode-list .list { display: block; }
+
+  /* 스트립 아래쪽 빈 공간과 워드마크가 겹치도록 끌어올림 → 커진 작업만 워드마크를 덮음 */
+  .foot { position: relative; z-index: 1; margin-top: -190px; padding: 0 28px 20px; }
+  .mode-list .foot { margin-top: auto; }
+  .meta { position: relative; z-index: 3; display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .meta button.on { color: #111; } .meta button { color: #b0b0b0; }
+  .wordmark { width: 100%; height: auto; }
+  .mode-list .wordmark { width: 40%; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div id="kinds"></div>
+  <div class="c"><span>Index, About, Contact</span><br><span id="genres"></span></div>
+  <a class="r" href="#">PDF로 다운로드</a>
+</div>
+<main class="strip" id="strip"></main>
+<section class="list"><table id="table"></table></section>
+<div class="foot">
+  <div class="meta"><div><button data-m="strip" class="on">Carousel</button>, <button data-m="list">List</button></div><div id="clock"></div></div>
+  <img class="wordmark" src="../source/logo.svg" alt="디자인드바이연">
+</div>
+<script src="common.js"></script>
+<script>
+(async () => {
+  await P.load();
+  const tagBtn = (t) => `<button class="tag" data-t="${P.esc(t)}" style="--c:${P.colorOf.get(t) || "#111"}">${P.esc(t)}</button>`;
+  kinds.innerHTML = P.kinds.map(tagBtn).join('<span class="sep">, </span>');
+  genres.innerHTML = P.genres.map(tagBtn).join('<span class="sep">, </span>');
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest(".tag"); if (b) return P.toggle(b.dataset.t);
+    const m = e.target.closest("[data-m]");
+    if (m) {
+      document.body.classList.toggle("mode-list", m.dataset.m === "list");
+      document.querySelectorAll("[data-m]").forEach((x) => x.classList.toggle("on", x === m));
+    }
+  });
+  const tick = () => clock.textContent = "Seoul, KR  " + new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  tick(); setInterval(tick, 10000);
+
+  const render = () => {
+    document.querySelector(".top").classList.toggle("has-sel", P.sel.size > 0);
+    document.querySelectorAll(".tag").forEach((b) => b.classList.toggle("on", P.sel.has(b.dataset.t)));
+    const list = P.visible();
+    strip.innerHTML = list.map((w, i) => `
+      <div class="cell${i === 3 ? " big" : ""}">
+        <div class="no">${String(i + 1).padStart(2, "0")}.</div>
+        <div class="nm">${P.esc(w.title)}<br><span>[${P.esc(w.client || w.tags[0])}]</span></div>
+        <div class="im"><img src="${P.cover(w)}" alt="" loading="lazy"></div>
+      </div>`).join("");
+    table.innerHTML = list.map((w, i) => `<tr><td style="width:50px;color:#888">${String(i + 1).padStart(2, "0")}</td><td class="th" style="width:64px"><img src="${P.cover(w)}" alt="" loading="lazy"></td><td>${P.esc(w.title)}</td><td style="color:#888">${P.esc(w.client)}</td><td style="color:#888">${P.esc(w.tags.join(", "))}</td><td style="text-align:right">${w.year}</td></tr>`).join("");
+  };
+  // 마우스를 올린 작업이 크게
+  strip.addEventListener("mouseover", (e) => {
+    const c = e.target.closest(".cell"); if (!c) return;
+    strip.querySelectorAll(".cell.big").forEach((x) => x !== c && x.classList.remove("big"));
+    c.classList.add("big");
+  });
+  addEventListener("wheel", (e) => { if (!document.body.classList.contains("mode-list") && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { strip.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+  P.onChange(render);
+  render();
+})();
+</script>
+</body>
+</html>

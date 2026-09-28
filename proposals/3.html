@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 3 — 콜라주</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: #fff; color: #111; }
+  .bar {
+    position: sticky; top: 0; z-index: 50;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    padding: 6px 12px; background: #efe6dc; font-size: 13px;
+  }
+  .hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 60px 40px 20px; }
+  .hero img { width: 300px; }
+  .hero p { margin: 0; font-size: 14px; line-height: 1.7; text-align: right; }
+
+  .board { position: relative; margin: 0 auto; }
+  .pic {
+    position: absolute; cursor: pointer;
+    background: #fff; padding: 5px; box-shadow: 0 1px 3px rgb(0 0 0 / .12);
+    transition: opacity .25s, transform .25s;
+  }
+  .pic img { width: 100%; height: auto; }
+  .pic:hover { z-index: 40 !important; transform: scale(1.03); }
+  .pic .cap { position: absolute; left: 5px; top: calc(100% + 4px); font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  .pic:hover .cap { opacity: 1; }
+  .pic.off { opacity: .06; pointer-events: none; }
+  /* 이미지 사이에 흩뿌린 태그 단어 = 필터 */
+  .word { position: absolute; z-index: 30; font-size: 14px; white-space: nowrap; color: #111; }
+  .word:hover { text-decoration: underline; }
+  .has-sel .word:not(.on) { color: #c4c4c4; }
+  .word.on { font-weight: 700; text-decoration: underline; text-decoration-color: var(--c, #111); text-decoration-thickness: 3px; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="bar"><span>디자인드바이연</span><span>Explore</span><span>Projects</span><span>Contact</span></div>
+<div class="hero">
+  <img src="../source/logo.svg" alt="디자인드바이연">
+  <p>그래픽 디자이너 김도연입니다.<br>한글 레터링을 주로 하고 있습니다.</p>
+</div>
+<main class="board" id="board"></main>
+<script src="common.js"></script>
+<script>
+(async () => {
+  await P.load();
+  const W = Math.min(innerWidth, 1400);
+  board.style.width = W + "px";
+  const rnd = P.rand(7);
+  const tags = [...P.kinds, ...P.genres];
+  let y = 40, html = "";
+  // 사인 곡선을 따라 흘러가듯 배치 + 크기는 제각각
+  P.data.works.forEach((w, i) => {
+    const size = 110 + rnd() * rnd() * 300;
+    const x = W / 2 + Math.sin(i * 0.33) * W * 0.33 + (rnd() - 0.5) * 160 - size / 2;
+    html += `<div class="pic" data-i="${i}" style="left:${Math.max(0, Math.min(W - size, x))}px;top:${y}px;width:${size}px;z-index:${Math.round(rnd() * 20)}">
+      <img src="${P.cover(w)}" alt="" loading="lazy"><span class="cap">${P.esc(w.title)}${w.year ? " · " + w.year : ""}</span></div>`;
+    // 몇 장마다 태그 단어를 사이사이에
+    if (i % 3 === 1) {
+      const t = tags[(i / 3 | 0) % tags.length];
+      const tx = W / 2 + Math.sin(i * 0.33 + 1.6) * W * 0.28;
+      html += `<button class="word" data-t="${P.esc(t)}" style="left:${tx}px;top:${y + 30}px;--c:${P.colorOf.get(t) || "#111"}">${P.esc(t)}</button>`;
+    }
+    y += 55 + rnd() * 70;
+  });
+  board.innerHTML = html;
+  board.style.height = y + 500 + "px";
+
+  document.addEventListener("click", (e) => { const b = e.target.closest(".word"); if (b) P.toggle(b.dataset.t); });
+  const render = () => {
+    board.classList.toggle("has-sel", P.sel.size > 0);
+    board.querySelectorAll(".word").forEach((b) => b.classList.toggle("on", P.sel.has(b.dataset.t)));
+    board.querySelectorAll(".pic").forEach((el) => el.classList.toggle("off", !P.match(P.data.works[el.dataset.i])));
+  };
+  P.onChange(render);
+  render();
+})();
+</script>
+</body>
+</html>

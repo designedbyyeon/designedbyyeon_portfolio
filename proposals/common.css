@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, "Malgun Gothic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+  letter-spacing: -0.01em;
+}
+img { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; letter-spacing: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* 시안 전환 바 (시안 확인용) */
+.switcher {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #111;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.switcher a { color: #999; padding: 6px 12px; border-radius: 999px; }
+.switcher a.on, .switcher a:hover { color: #fff; background: #333; }

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 6 — 문장형 필터</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css">
+<style>
+  :root { --bg: #fcfcfc; --muted: #9a9a9a; --soft: #b8b8b8; --gray: #d6d6d6; --g: clamp(20px, 4.75vw, 88px); }
+  body { background: var(--bg); color: #000; }
+
+  /* 헤더: 0927 시안 구조 (로고 왼쪽, 메뉴 오른쪽) */
+  header { display: grid; grid-template-columns: auto 1fr; padding: 48px var(--g) 0; }
+  .logo img { width: clamp(260px, 34vw, 620px); }
+  .side { justify-self: end; }
+  nav { display: flex; gap: 26px; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+  /* PDF: 문장이 끝나는 자리에 붙음 → "…등을 만듭니다. (PDF로 다운로드)" */
+  /* 태그 알약과 같은 글자 크기·여백. 테두리 대신 안쪽 선으로 표시해 크기가 똑같이 맞음 */
+  .pdf {
+    display: inline-flex; align-items: flex-start; gap: .3em;
+    margin: .06em .06em .06em .35em; padding: .16em .78em .2em;
+    border-radius: 999px; box-shadow: inset 0 0 0 2px #000;
+    line-height: 1.3; letter-spacing: -0.03em; white-space: nowrap;
+    color: #000; transition: background-color .15s, color .15s;
+  }
+  .pdf:hover { background: #000; color: #fff; }
+  .actions { padding: 36px var(--g) 0; }
+
+  /* 소개 문장 = 필터 */
+  .sentence {
+    padding: clamp(60px, 9vw, 150px) var(--g) 0;
+    font-size: clamp(22px, 2.5vw, 40px);
+    font-weight: 600;
+    line-height: 2.15;
+    letter-spacing: -0.025em;
+    max-width: 1500px;
+  }
+  .sentence .w { color: var(--soft); transition: color .25s, opacity .25s; }   /* 문장 연결 말 */
+  .bind { white-space: nowrap; }
+  .has-sel .w { opacity: .35; }
+  .has-sel .w.live { color: #000; opacity: 1; }                                  /* 선택된 태그로 만든 문장 */
+
+  /* 알약: 테두리 없이 면으로만, 여백·글자 간격을 다듬음 */
+  .chip {
+    --c: var(--gray);
+    display: inline-flex; align-items: flex-start; gap: .18em;
+    padding: .16em .78em .2em;
+    margin: .06em .06em;
+    border-radius: 999px;
+    background: var(--c);
+    color: #000;
+    line-height: 1.3;
+    letter-spacing: -0.03em;
+    transition: background-color .2s, color .2s, opacity .25s, filter .15s;
+  }
+  .chip sup { font-size: .36em; font-weight: 600; line-height: 1; margin-top: .55em; opacity: .55; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .chip:hover:not(:disabled) { filter: brightness(.94); }
+  .chip.on:not(.colored) { --c: #111; color: #fff; }
+  .chip.on sup { opacity: .8; }
+  .has-sel .chip:not(.on) { opacity: .22; }
+  .has-sel .chip:not(.on):hover:not(:disabled) { opacity: .6; }
+  .chip:disabled { opacity: .1 !important; cursor: default; }
+
+  .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .count b { color: #000; font-weight: 600; }
+  .count button { margin-left: 12px; color: #000; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* 스크롤하면 위에 붙는 작은 태그 줄 */
+  .mini {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    padding: 10px var(--g); background: rgb(252 252 252 / .96); border-bottom: 1px solid #eee;
+    font-size: 12px; font-weight: 600;
+    transform: translateY(-100%); transition: transform .2s;
+  }
+  .mini.show { transform: none; }
+  .mini .chip { padding: 6px 14px 7px; line-height: 1.2; }
+  .mini .count { padding: 0; margin-left: auto; }
+
+  /* 그리드: 0927 시안의 5열 3:4 */
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 36px 18px; padding: 44px var(--g) 160px; }
+  .tile { cursor: pointer; transition: opacity .2s; }
+  .tile .im { aspect-ratio: 3 / 4; background: #efefef; overflow: hidden; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; }
+  .tile .hd { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 13px; font-weight: 600; }
+  .tile .hd span { color: var(--muted); font-weight: 400; }
+  .tile .tg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font-size: 11px; color: var(--muted); }
+  .tile .tg i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .tile .tg .hit { color: #000; }
+  /* 태그에 마우스를 올리면 해당 작업 미리보기 */
+  .peeking .tile:not(.peek) { opacity: .18; }
+  .tile.enter { animation: enter .25s ease-out; }
+  @keyframes enter { from { opacity: 0; } }
+
+  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px) { .grid { grid-template-columns: repeat(2, 1fr); } header { grid-template-columns: 1fr; gap: 24px; } .side { align-items: flex-start; } }
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="#"><img src="../source/logo.svg" alt="디자인드바이연"></a>
+  <div class="side">
+    <nav><a href="#">WORK</a><a href="#">CONTACT</a><a href="#">CODING</a></nav>
+  </div>
+</header>
+
+<section class="sentence" id="sentence" aria-live="polite"></section>
+<div class="actions" id="actions">
+  <div class="count" id="count"></div>
+</div>
+<a class="pdf" id="pdf" href="#">PDF로 다운로드 ↓</a>
+<div class="mini" id="mini"></div>
+<main class="grid" id="grid"></main>
+
+<script src="common.js"></script>
+<script>
+// 받침 여부로 을/를 고르기 (영문·숫자는 읽는 소리 기준: 엘·엠·엔·알 / 영·일·삼·육·칠·팔 → 받침 있음)
+function objectJosa(word) {
+  const ch = word.trim().slice(-1);
+  const code = ch.charCodeAt(0) - 0xac00;
+  let batchim;
+  if (code >= 0 && code <= 11171) batchim = code % 28 !== 0;
+  else if (/[a-z]/i.test(ch)) batchim = "lmnr".includes(ch.toLowerCase());
+  else if (/\d/.test(ch)) batchim = "013678".includes(ch);
+  else batchim = false;
+  return batchim ? "을" : "를";
+}
+
+(async () => {
+  await P.load();
+  const works = P.data.works;
+  const chip = (t, count = true) =>
+    `<button class="chip${P.colorOf.get(t) ? " colored" : ""}" data-t="${P.esc(t)}"${P.colorOf.get(t) ? ` style="--c:${P.colorOf.get(t)}"` : ""}>${P.esc(t)}${count ? "<sup></sup>" : ""}</button>`;
+  // 태그 사이 쉼표도 따로 두어, 선택된 태그끼리만 이어지게
+  const group = (tags) => tags.map((t, i) => chip(t) + (i < tags.length - 1 ? '<span class="w sep">, </span>' : "")).join("");
+
+  sentence.innerHTML = `
+    <span class="w lead">그래픽 디자이너 김도연입니다.</span><br>
+    <span id="kinds">${group(P.kinds)} <span class="w" id="end1"></span></span><br>
+    <span id="genres">${group(P.genres)} <span class="w" id="end2"></span></span>`;
+  mini.innerHTML = [...P.kinds, ...P.genres].map((t) => chip(t, false)).join("") + `<span class="count" id="mcount"></span>`;
+
+  // 타일은 한 번만 만들고 재사용
+  const tiles = works.map((w, i) => {
+    const el = document.createElement("article");
+    el.className = "tile";
+    el.dataset.i = i;
+    el.innerHTML = `
+      <div class="im"><img src="${P.cover(w)}" alt="" loading="lazy"></div>
+      <div class="hd">${P.esc(w.title)}<span>${w.year}</span></div>
+      <div class="tg">${w.tags.map((t) => P.colorOf.get(t) ? `<i title="${P.esc(t)}" style="--c:${P.colorOf.get(t)}"></i>` : `<span data-t="${P.esc(t)}">${P.esc(t)}</span>`).join("")}</div>`;
+    return el;
+  });
+
+  const countIfOn = (t) => { const had = P.sel.has(t); P.sel.add(t); const n = P.visible().length; if (!had) P.sel.delete(t); return n; };
+
+  // 선택한 태그만으로 문장 만들기
+  // - 태그 순서는 그대로 두고, 끝말("작업으로", "을 만듭니다.")은 항상 그 줄의 맨 끝에
+  // - 선택한 태그와 끝말만 또렷하게 → "한글레터링 작업으로 프로모션을 만듭니다."
+  function composeLine(lineEl, endEl, text, attach = false) {
+    // 지난번에 묶어둔 [마지막 태그 + 끝말]을 풀고 다시 조립
+    lineEl.querySelectorAll(".bind").forEach((b) => b.replaceWith(...b.childNodes));
+    lineEl.append(endEl);
+    const chips = [...lineEl.querySelectorAll(".chip")];
+    const picked = chips.filter((c) => P.sel.has(c.dataset.t));
+    // 쉼표는 선택된 태그 뒤이면서 뒤에 선택된 태그가 더 있을 때만 문장에 포함
+    chips.forEach((c) => {
+      const sep = c.nextElementSibling?.classList.contains("sep") ? c.nextElementSibling : null;
+      const i = picked.indexOf(c);
+      sep?.classList.toggle("live", i >= 0 && i < picked.length - 1);
+    });
+    endEl.textContent = text;
+    endEl.classList.toggle("live", picked.length > 0);
+    // 줄의 마지막 태그와 끝말을 한 덩어리로 묶어 줄바꿈 때 갈라지지 않게
+    const last = chips.at(-1);
+    const bind = document.createElement("span");
+    bind.className = "bind";
+    last.before(bind);
+    // 조사(을/를)는 바로 붙이고, 그 외("작업으로", "등을 만듭니다.")는 한 칸 띄움
+    bind.append(last, attach && picked.length ? "" : " ", endEl);
+  }
+
+  const render = () => {
+    const vis = new Set(P.visible());
+    const on = P.sel.size > 0;
+    const k = P.kinds.filter((t) => P.sel.has(t));
+    const g = P.genres.filter((t) => P.sel.has(t));
+    [sentence, mini].forEach((el) => el.classList.toggle("has-sel", on));
+
+    document.querySelectorAll(".chip").forEach((b) => {
+      const t = b.dataset.t, sel = P.sel.has(t), n = countIfOn(t);
+      b.classList.toggle("on", sel);
+      b.disabled = !sel && n === 0;
+      const sup = b.querySelector("sup");
+      if (sup) sup.textContent = sel ? "✕" : n;
+    });
+
+    // 공백 텍스트가 쌓이지 않도록 정리 후 문장 조립
+    [kinds, genres].forEach((l) => [...l.childNodes].forEach((n) => { if (n.nodeType === 3 && !n.textContent.trim()) n.remove(); }));
+    composeLine(kinds, end1, k.length && !g.length ? "작업을 합니다." : "작업으로");
+    composeLine(genres, end2, g.length ? `${objectJosa(g.at(-1))} 만듭니다.` : "등을 만듭니다.", true);
+    // 첫 문장은 무언가 선택되면 또렷하게
+    sentence.querySelector(".lead").classList.toggle("live", on);
+    // 장르만 골랐을 땐 "작업으로"는 빼고, 작업 종류만 골랐을 땐 장르 줄 끝말을 흐리게
+    if (!k.length) end1.classList.remove("live");
+    // PDF 버튼은 지금 읽히는 문장의 끝에 붙임 (작업 종류만 골랐으면 "작업을 합니다." 뒤)
+    const end = k.length && !g.length ? end1 : end2;
+    (end.closest(".bind") || end).after(pdf);
+
+    count.innerHTML = `<b>${vis.size}</b> / ${works.length}개 작업${on ? '<button data-clear>모두 보기</button>' : ""}`;
+    mcount.innerHTML = `${vis.size} / ${works.length}${on ? '<button data-clear style="margin-left:8px;text-decoration:underline">모두 보기</button>' : ""}`;
+
+    tiles.forEach((el) => {
+      const show = vis.has(works[el.dataset.i]);
+      if (!show && el.isConnected) el.remove();
+      if (show && !el.isConnected) { el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter"); }
+      if (show) grid.appendChild(el);
+      el.querySelectorAll(".tg span").forEach((s) => s.classList.toggle("hit", P.sel.has(s.dataset.t)));
+    });
+  };
+
+  // 태그에 마우스를 올리면 해당 작업 미리보기
+  const peek = (t) => {
+    grid.classList.toggle("peeking", !!t);
+    tiles.forEach((el) => {
+      el.classList.toggle("peek", !!t && works[el.dataset.i].tags.includes(t));
+    });
+  };
+  document.addEventListener("mouseover", (e) => { const b = e.target.closest(".chip"); peek(b && !b.disabled ? b.dataset.t : null); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip");
+    if (b) { P.toggle(b.dataset.t); peek(null); return; }
+    if (e.target.closest("[data-clear]")) P.clear();
+  });
+  new IntersectionObserver(([e]) => mini.classList.toggle("show", !e.isIntersecting)).observe(actions);
+
+  P.onChange(render);
+  render();
+})();
+</script>
+</body>
+</html>

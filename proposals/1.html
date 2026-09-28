@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 1 — 인덱스 월</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="common.css">
+<style>
+  body { background: #f3f3f1; color: #111; }
+  header {
+    display: grid;
+    grid-template-columns: 220px 120px 160px 1fr auto;
+    gap: 32px;
+    padding: 28px 36px 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .logo img { width: 150px; }
+  .col { display: flex; flex-direction: column; align-items: flex-start; }
+  .col .lbl { color: #999; margin-bottom: 2px; }
+  .tag { color: #111; transition: color .15s; }
+  .tag i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .has-sel .tag:not(.on) { color: #b5b5b5; }
+  .tag.on { text-decoration: underline; text-underline-offset: 3px; }
+  .intro { color: #555; max-width: 260px; }
+  .pdf { text-decoration: underline; text-underline-offset: 3px; }
+
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 64px 44px;
+    padding: 90px 36px 140px;
+  }
+  .item { position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: opacity .2s; }
+  /* 자르지 않고 원래 비율 그대로: 물건들을 늘어놓은 느낌 */
+  .frame { width: 100%; aspect-ratio: 1; display: flex; align-items: flex-end; justify-content: center; }
+  .frame img { max-width: 100%; max-height: 100%; width: auto; height: auto; box-shadow: 0 1px 0 rgb(0 0 0 / .06); }
+  .cap { margin-top: 10px; font-size: 11px; color: #777; text-align: center; opacity: 0; transition: opacity .15s; }
+  .item:hover .cap { opacity: 1; }
+  /* 필터: 사라지지 않고 흐려짐 → 벽 전체의 배치는 유지 */
+  .item.off { opacity: .07; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="#"><img src="../source/logo.svg" alt="디자인드바이연"></a>
+  <div class="col"><a href="#">Work</a><a href="#">About</a><a href="#">Contact</a></div>
+  <div class="col" id="kinds"><span class="lbl">작업 종류</span></div>
+  <div class="col" id="genres" style="display:grid;grid-template-columns:repeat(2,max-content);justify-content:start;justify-items:start;column-gap:28px"><span class="lbl" style="grid-column:1/-1">장르</span></div>
+  <div class="col" style="align-items:flex-end;text-align:right">
+    <p class="intro" style="margin:0 0 10px">그래픽 디자이너 김도연입니다.<br>한글 레터링을 주로 하고 있습니다.</p>
+    <a class="pdf" href="#">PDF로 다운로드</a>
+  </div>
+</header>
+<main class="wall" id="wall"></main>
+<script src="common.js"></script>
+<script>
+(async () => {
+  await P.load();
+  const tagBtn = (t) => `<button class="tag" data-t="${P.esc(t)}">${P.colorOf.get(t) ? `<i style="background:${P.colorOf.get(t)}"></i>` : ""}${P.esc(t)}</button>`;
+  kinds.insertAdjacentHTML("beforeend", P.kinds.map(tagBtn).join(""));
+  genres.insertAdjacentHTML("beforeend", P.genres.map(tagBtn).join(""));
+  wall.innerHTML = P.data.works.map((w, i) => `
+    <div class="item" data-i="${i}">
+      <div class="frame"><img src="${P.cover(w)}" alt="" loading="lazy"></div>
+      <div class="cap">${P.esc(w.title)}</div>
+    </div>`).join("");
+  document.addEventListener("click", (e) => { const b = e.target.closest(".tag"); if (b) P.toggle(b.dataset.t); });
+  const render = () => {
+    document.querySelector("header").classList.toggle("has-sel", P.sel.size > 0);
+    document.querySelectorAll(".tag").forEach((b) => b.classList.toggle("on", P.sel.has(b.dataset.t)));
+    document.querySelectorAll(".item").forEach((el) => el.classList.toggle("off", !P.match(P.data.works[el.dataset.i])));
+  };
+  P.onChange(render);
+  render();
+})();
+</script>
+</body>
+</html>
