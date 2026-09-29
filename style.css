@@ -266,6 +266,9 @@ img { display: block; max-width: 100%; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: 28px 10px; }
   .mini { display: none; } /* 폰에서는 태그가 많아 위에 붙이지 않음 */
   /* minmax(0, 1fr): 사진 줄이 칸을 밀어 화면 전체가 옆으로 늘어나지 않게 */
+  /* 작업 페이지 이전/다음: 폰에서는 한 줄씩 (제목이 너무 잘리지 않게) */
+  .work-siblings { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .sib-empty { display: none; }
   .act { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .act-meta { flex-direction: row; align-items: center; }
   /* 폰: 사진을 화면 폭에 맞춘 2열 격자로. 접힌 상태에선 4장까지, 4번째에 +N */

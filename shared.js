@@ -11,8 +11,8 @@ async function loadData() {
   const res = await fetch("works.json", { cache: "no-store" });
   if (!res.ok) throw new Error(res.status);
   const d = await res.json();
-  d.activities ||= [];
-  d.activityGroups ||= [];
+  d.activities = d.activities || [];
+  d.activityGroups = d.activityGroups || [];
   setTagColors(d);
   return d;
 }
@@ -129,16 +129,19 @@ function openContact() {
     ? `<a class="chip colored contact-chip" style="--c:${esc(color(i))}" href="${esc(href)}"${href.startsWith("http") ? ' target="_blank" rel="noopener"' : ""}>${esc(inner)}</a>`
     : `<button type="button" class="chip colored contact-chip" style="--c:${esc(color(i))}" data-copy="${esc(inner)}" title="누르면 아이디가 복사돼요">${esc(inner)}</button>`;
 
+  // 알약과 뒤따르는 조사는 한 덩어리로 묶어, 줄이 바뀔 때 조사만 다음 줄로 떨어지지 않게
+  const bind = (html, josa) => `<span class="bind">${html}${josa}</span>`;
+
   const lines = ["안녕하세요 디자이너 김도연입니다."];
-  if (c.email) lines.push(`프로젝트는 ${pill(0, c.email, `mailto:${c.email}`)}${towardJosa(c.email)} 내용을 정리해서 보내주시면 빠르게 확인 후 회신드리고 있습니다.`);
-  const tel = c.phone && pill(1, c.phone, `tel:${c.phone.replace(/[^\d+]/g, "")}`);
-  const kakao = c.kakao && `카카오톡 ${pill(2, c.kakao)}${towardJosa(c.kakao)}`;
-  if (tel && kakao) lines.push(`급한 일은 ${tel}${towardJosa(c.phone)} 전화를 주시거나 ${kakao} 연락 부탁드립니다.`);
-  else if (tel) lines.push(`급한 일은 ${tel}${towardJosa(c.phone)} 전화 부탁드립니다.`);
+  if (c.email) lines.push(`프로젝트는 ${bind(pill(0, c.email, `mailto:${c.email}`), towardJosa(c.email))} 내용을 정리해서 보내주시면 빠르게 확인 후 회신드리고 있습니다.`);
+  const tel = c.phone && bind(pill(1, c.phone, `tel:${c.phone.replace(/[^\d+]/g, "")}`), towardJosa(c.phone));
+  const kakao = c.kakao && `카카오톡 ${bind(pill(2, c.kakao), towardJosa(c.kakao))}`;
+  if (tel && kakao) lines.push(`급한 일은 ${tel} 전화를 주시거나 ${kakao} 연락 부탁드립니다.`);
+  else if (tel) lines.push(`급한 일은 ${tel} 전화 부탁드립니다.`);
   else if (kakao) lines.push(`급한 일은 ${kakao} 연락 부탁드립니다.`);
   if (c.instagram) {
     const id = c.instagram.replace(/^@/, "");
-    lines.push(`작업은 인스타그램 ${pill(3, "@" + id, `https://www.instagram.com/${id}/`)}에 가장 먼저 올라옵니다.`);
+    lines.push(`작업은 인스타그램 ${bind(pill(3, "@" + id, `https://www.instagram.com/${id}/`), "에")} 가장 먼저 올라옵니다.`);
   }
 
   dlg.innerHTML = `

@@ -98,7 +98,7 @@ function composeLine(line, endEl, text, attach = false) {
   endEl.textContent = text;
   endEl.classList.toggle("live", picked.length > 0);
   // 줄의 마지막 태그와 끝말을 한 덩어리로 묶어 줄바꿈 때 갈라지지 않게
-  const last = chips.at(-1);
+  const last = chips[chips.length - 1];
   const bind = document.createElement("span");
   bind.className = "bind";
   last.before(bind);
@@ -129,10 +129,10 @@ function updateSentence() {
     const k = kindTags.filter((t) => state.selected.has(t));
     const g = genreTags.filter((t) => state.selected.has(t));
     composeLine($("#kind-line"), $("#end1"), k.length && !g.length ? "작업을 합니다." : "작업으로");
-    composeLine($("#genre-line"), end2, g.length ? `${objectJosa(g.at(-1))} 만듭니다.` : "등을 만듭니다.", true);
+    composeLine($("#genre-line"), end2, g.length ? `${objectJosa(g[g.length - 1])} 만듭니다.` : "등을 만듭니다.", true);
   } else {
     const a = kindTags.filter((t) => state.selected.has(t));
-    composeLine($("#genre-line"), end2, a.length ? `${towardJosa(a.at(-1))} 사람들과 만납니다.` : "등으로 사람들과 만납니다.", true);
+    composeLine($("#genre-line"), end2, a.length ? `${towardJosa(a[a.length - 1])} 사람들과 만납니다.` : "등으로 사람들과 만납니다.", true);
   }
   sentence.querySelector(".lead").classList.toggle("live", on);
 
