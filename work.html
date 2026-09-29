@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>디자인드바이연 — 그래픽 디자이너 김도연</title>
+  <meta name="description" content="그래픽 디자이너 김도연입니다. 한글 레터링을 주로 하고 있습니다.">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="work-body">
+  <header class="site-header">
+    <a class="logo" href="./" aria-label="디자인드바이연 홈">
+      <img src="source/logo.svg" alt="디자인드바이연">
+    </a>
+    <nav class="nav" aria-label="주요 메뉴">
+      <a href="./" data-nav="work">WORK</a>
+      <a href="./#view=activity" data-nav="activity">ACTIVITY</a>
+      <button type="button" data-contact>CONTACT</button>
+    </nav>
+  </header>
+
+  <!-- 작업 하나의 페이지: work.html?w=작업폴더이름 (활동은 ?a=) -->
+  <main id="page" class="work-page"></main>
+
+  <dialog id="contact" class="contact" aria-label="연락처"></dialog>
+
+  <script src="shared.js"></script>
+  <script src="work.js"></script>
+</body>
+</html>
