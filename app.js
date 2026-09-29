@@ -230,7 +230,8 @@ function createTile(w) {
   el.innerHTML = `
     <button type="button" class="tile-btn" aria-label="${esc(w.title)} 자세히 보기">
       ${coverHtml(w)}
-      ${w.videos?.length ? `<span class="video-badge" title="영상 포함">▶</span>` : ""}
+      ${w.clips?.length ? `<video class="tile-clip" src="${fileUrl(w.clips[0].src)}" muted loop playsinline preload="metadata"></video>` : ""}
+      ${w.videos?.length || w.clips?.length ? `<span class="video-badge" title="영상 포함">▶</span>` : ""}
     </button>
     <div class="tile-head">
       <span class="tile-title">${esc(w.title)}</span>
@@ -240,7 +241,25 @@ function createTile(w) {
       ? `<i title="${esc(t)}" style="--c:${esc(tagColor(t))}"></i>`
       : `<span data-tag-label="${esc(t)}">${esc(t)}</span>`).join("")}</div>`;
   fadeInImages(el);
+  hoverPlay(el);
   return el;
+}
+
+// 직접 넣은 영상: 마우스를 올리면 소리 없이 반복 재생, 떼면 멈춤
+// (폰은 마우스가 없고 데이터도 아끼기 위해 자동 재생하지 않음 → 눌러서 상세 보기에서 재생)
+const canHover = matchMedia("(hover: hover)").matches;
+function hoverPlay(el) {
+  const video = el.querySelector(".tile-clip");
+  if (!video || !canHover) return;
+  const btn = el.querySelector(".tile-btn");
+  el.addEventListener("mouseenter", () => {
+    video.play().then(() => btn.classList.add("playing")).catch(() => {});
+  });
+  el.addEventListener("mouseleave", () => {
+    video.pause();
+    video.currentTime = 0;
+    btn.classList.remove("playing");
+  });
 }
 
 function renderGrid(visible, { animated = true } = {}) {
@@ -263,15 +282,22 @@ function renderGrid(visible, { animated = true } = {}) {
 // 사진과 글이 많으므로 썸네일 하나 대신:
 //   왼쪽 = 날짜·태그 / 오른쪽 = 제목·주최·글(앞부분, "더 보기"로 펼침) + 사진 여러 장을 가로로
 const actEls = new Map();
+const MOBILE_PHOTOS = 4; // 폰에서 접힌 상태로 보여줄 사진 수
+const isMobile = () => matchMedia("(max-width: 700px)").matches;
 
 function createActivity(a) {
   const el = document.createElement("article");
   el.className = "act";
   el.dataset.id = a.id;
   const photos = [
+    ...(a.clips || []).map((c) => `<button type="button" class="act-photo is-video" data-open="${esc(a.id)}" aria-label="영상 보기">${c.poster ? `<img src="${fileUrl(c.poster)}" alt="" loading="lazy">` : ""}<span class="video-badge">▶</span></button>`),
     ...a.videos.map((v) => `<button type="button" class="act-photo is-video" data-open="${esc(a.id)}" aria-label="영상 보기">${ytThumbHtml(v)}<span class="video-badge">▶</span></button>`),
     ...a.images.map((src, i) => `<button type="button" class="act-photo" data-open="${esc(a.id)}" data-img="${i}" aria-label="${esc(a.title)} 사진 ${i + 1}"><img src="${fileUrl(src)}" alt="" loading="lazy"></button>`),
   ];
+  // 폰에서는 사진을 4장까지만 격자로 보여주고, 4번째 사진에 나머지 장수(+N)를 표시
+  if (photos.length > MOBILE_PHOTOS) {
+    photos[MOBILE_PHOTOS - 1] = photos[MOBILE_PHOTOS - 1].replace('class="act-photo', `data-rest="+${photos.length - MOBILE_PHOTOS}" class="act-photo`);
+  }
   el.innerHTML = `
     <div class="act-meta">
       <span class="act-date">${esc(a.year)}</span>
@@ -280,7 +306,8 @@ function createActivity(a) {
     <div class="act-body">
       <h3 class="act-title">${esc(a.title)}</h3>
       ${a.client ? `<p class="act-client">${esc(a.client)}</p>` : ""}
-      ${a.description ? `<div class="act-desc">${esc(a.description)}</div><button type="button" class="act-more" data-more hidden>더 보기 +</button>` : ""}
+      ${a.description ? `<div class="act-desc">${esc(a.description)}</div>` : ""}
+      ${a.description || photos.length > MOBILE_PHOTOS ? `<button type="button" class="act-more" data-more hidden>더 보기 +</button>` : ""}
       ${photos.length ? `<div class="act-photos">${photos.join("")}</div>` : ""}
     </div>`;
   fadeInImages(el);
@@ -288,11 +315,14 @@ function createActivity(a) {
 }
 
 // 글이 3줄을 넘을 때만 "더 보기" 표시
+// "더 보기"는 글이 3줄을 넘거나, 폰에서 사진이 4장보다 많을 때만 표시
 function checkOverflow(el) {
   const desc = el.querySelector(".act-desc");
   const more = el.querySelector("[data-more]");
-  if (!desc || !more || el.classList.contains("open")) return;
-  more.hidden = desc.scrollHeight <= desc.clientHeight + 2;
+  if (!more || el.classList.contains("open")) return;
+  const longText = !!desc && desc.scrollHeight > desc.clientHeight + 2;
+  const hiddenPhotos = isMobile() && el.querySelectorAll(".act-photo").length > MOBILE_PHOTOS;
+  more.hidden = !(longText || hiddenPhotos);
 }
 
 function renderActivities(visible, { animated = true } = {}) {
@@ -394,6 +424,7 @@ function openDetail(id, imgIndex) {
       <div class="detail-tags">${w.tags.map((t) => `<span class="chip${tagColor(t) ? " colored" : ""}"${tagColor(t) ? ` style="--c:${esc(tagColor(t))}"` : ""}>${esc(t)}</span>`).join("")}</div>
       ${rows.length ? `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
       ${w.description ? `<p class="detail-desc">${esc(w.description)}</p>` : ""}
+      ${w.clips?.length ? `<div class="detail-videos">${w.clips.map((c) => `<video class="clip" src="${fileUrl(c.src)}"${c.poster ? ` poster="${fileUrl(c.poster)}"` : ""} controls autoplay muted loop playsinline preload="metadata"></video>`).join("")}</div>` : ""}
       ${w.videos?.length ? `<div class="detail-videos">${w.videos.map(videoHtml).join("")}</div>` : ""}
       <div class="detail-images">${w.images.map((src) => `<img src="${fileUrl(src)}" alt="" loading="lazy">`).join("")}</div>
     </div>`;

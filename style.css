@@ -131,6 +131,10 @@ img { display: block; max-width: 100%; }
 .tile-btn img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s ease; }
 .tile-btn img.loaded { opacity: 1; }
 .tile-btn:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
+/* 직접 넣은 영상: 마우스를 올리면 대표 이미지 위로 재생 */
+.tile-clip { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+.tile-btn.playing .tile-clip { opacity: 1; }
+.tile-btn.playing .video-badge { opacity: 0; }
 .video-badge {
   position: absolute; top: 12px; right: 12px;
   display: grid; place-items: center;
@@ -161,6 +165,7 @@ img { display: block; max-width: 100%; }
   transition: opacity var(--t);
 }
 .act:last-of-type { border-bottom: 1px solid #e8e8e8; }
+.act-body { min-width: 0; }
 .act-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .act-date { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .act-tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; font-weight: 600; }
@@ -212,6 +217,7 @@ img { display: block; max-width: 100%; }
 .detail dd { margin: 0; }
 .detail-videos { display: flex; flex-direction: column; gap: 12px; margin-top: 32px; }
 .video { position: relative; aspect-ratio: 16 / 9; background: #000; }
+.clip { display: block; width: 100%; height: auto; background: #000; }
 .video.vertical { aspect-ratio: 9 / 16; width: min(100%, 400px); margin: 0 auto; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .detail-images { display: flex; flex-direction: column; gap: 12px; margin-top: 32px; }
@@ -246,8 +252,28 @@ img { display: block; max-width: 100%; }
   .nav { justify-self: start; order: -1; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: 28px 10px; }
   .mini { display: none; } /* 폰에서는 태그가 많아 위에 붙이지 않음 */
-  .act { grid-template-columns: 1fr; gap: 14px; }
+  /* minmax(0, 1fr): 사진 줄이 칸을 밀어 화면 전체가 옆으로 늘어나지 않게 */
+  .act { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .act-meta { flex-direction: row; align-items: center; }
+  /* 폰: 사진을 화면 폭에 맞춘 2열 격자로. 접힌 상태에선 4장까지, 4번째에 +N */
+  .act-photos, .act.open .act-photos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+  .act-photo { height: auto; min-width: 0; aspect-ratio: 1; }
+  .act-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .act-photo.is-video img { aspect-ratio: auto; }
+  .act:not(.open) .act-photo:nth-child(n + 5) { display: none; }
+  .act:not(.open) .act-photo[data-rest]::after {
+    content: attr(data-rest);
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    background: rgb(0 0 0 / .45);
+    color: #fff; font-size: 20px; font-weight: 700;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

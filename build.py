@@ -23,6 +23,8 @@ CONTACT_KEYS = {
 OUT_FILE = ROOT / "works.json"
 INFO_NAME = "info.txt"
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+CLIP_EXT = {".mp4", ".webm"}                     # 사이트에서 바로 재생할 영상
+RAW_VIDEO_EXT = {".mov", ".m4v", ".avi", ".mkv"}  # optimize_images.py로 mp4 변환이 필요한 영상
 
 # info.txt 에서 인식하는 항목 (한글/영문 모두 가능, 띄어쓰기 무시)
 KEY_ALIASES = {
@@ -150,7 +152,8 @@ def find_info_file(folder, warnings):
 def load_work(folder, warnings):
     rel = lambda p: p.relative_to(ROOT).as_posix()
     images = sorted(
-        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXT),
+        # '영상이름.poster.webp'는 영상의 대표 장면이라 이미지 목록에서 뺀다
+        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXT and ".poster." not in p.name),
         key=lambda p: natural_key(p.name),
     )
     info_path = find_info_file(folder, warnings)
@@ -163,8 +166,18 @@ def load_work(folder, warnings):
     tags = split_tags(meta.get("tags", ""))
     if not tags:
         warnings.append(f"[{folder.name}] 태그 없음")
-    if not images:
+    if not images and not any(p.suffix.lower() in CLIP_EXT for p in folder.iterdir()):
         warnings.append(f"[{folder.name}] 이미지 없음")
+    # 직접 넣은 영상 (mp4). 대표 장면(poster)이 있으면 함께
+    clips = []
+    for v in sorted((p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in CLIP_EXT and not p.name.endswith(".tmp.mp4")), key=lambda p: natural_key(p.name)):
+        poster = v.with_name(v.stem + ".poster.webp")
+        clips.append({"src": rel(v), "poster": rel(poster) if poster.exists() else None})
+        if v.stat().st_size > 20 * 1024 * 1024 or not poster.exists():
+            warnings.append(f"[{folder.name}] 영상 '{v.name}' 최적화 안 됨 → optimize_images.py 실행 추천")
+    raw = [p.name for p in folder.iterdir() if p.is_file() and p.suffix.lower() in RAW_VIDEO_EXT]
+    if raw:
+        warnings.append(f"[{folder.name}] 브라우저에서 재생 안 되는 영상 {', '.join(raw)} → optimize_images.py로 mp4 변환 필요")
     heavy = [p.name for p in images if p.stat().st_size > 2 * 1024 * 1024]
     if heavy:
         warnings.append(f"[{folder.name}] 2MB 넘는 이미지 {len(heavy)}개 → optimize_images.py 실행 추천")
@@ -207,7 +220,9 @@ def load_work(folder, warnings):
         "description": description,
         "extra": extra,
         "videos": videos,
-        "cover": rel(cover) if cover else None,
+        "clips": clips,
+        # 이미지 없이 영상만 있으면 영상의 대표 장면을 대표 이미지로
+        "cover": rel(cover) if cover else next((c["poster"] for c in clips if c["poster"]), None),
         "images": [rel(p) for p in images],
     }
 
